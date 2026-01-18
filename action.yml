@@ -1,141 +1,442 @@
 name: C/C++ Linter
-description: Lint C/C++ code with clang-format and clang-tidy then post annotations, comments, and step summary with results.
-author: shenxianpeng
+description: Linting C/C++ code with clang-tidy or clang-format to give feedback as comments, PR reviews, and more.
+author: cpp-linter
 branding:
   icon: "check-circle"
   color: "green"
 inputs:
-  thread-comments:
-    description: Set this option to true to enable the use of thread comments as feedback. Defaults to false.
-    required: false
-    default: false
-  step-summary:
-    description: >
-      Set this option to true to append content as part of workflow's job summary. Defaults to false.
-
-      See implementation details in GitHub's documentation about
-      [Adding a job summary](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary).
-      This option is independent of the `thread-comments` option, rather this option uses the same content that
-      the `thread-comments` option would use.
-    required: false
-    default: false
-  file-annotations:
-    description: Set this option to false to disable the use of file annotations as feedback. Defaults to true.
-    required: false
-    default: true
   style:
-    description: >
-      The style rules to use (defaults to 'llvm').
-      Set this to 'file' to have clang-format use the closest relative .clang-format file.
+    description: |
+      The style rules to use.
+
+      - Set this to `file` to have clang-format use the closest relative .clang-format file.
+      - Set this to a blank string (`''`) to disable the use of clang-format entirely.
+      - Any code style supported by the specified version of clang-format.
     required: false
     default: "llvm"
   extensions:
-    description: >
-      The file extensions to run the action against.
-      This comma-separated string defaults to 'c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx'.
+    description: The file extensions to run the action against. This is a comma-separated string.
     required: false
     default: "c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx"
   tidy-checks:
-    description: >
-      A string of regex-like patterns specifying what checks clang-tidy will use.
-      This defaults to 'boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*'. See also clang-tidy docs for more info.
+    description: |
+      Comma-separated list of globs with optional `-` prefix.
+      Globs are processed in order of appearance in the list.
+      Globs without `-` prefix add checks with matching names to the set,
+      globs with the `-` prefix remove checks with matching names from the set of enabled checks.
+      This option's value is appended to the value of the 'Checks' option in a .clang-tidy file (if any).
+
+      - It is possible to disable clang-tidy entirely by setting this option to `'-*'`.
+      - It is also possible to rely solely on a .clang-tidy config file by specifying this option as a blank string (`''`).
     required: false
     default: "boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*"
   repo-root:
     description: >
-      The relative path to the repository root directory. The default value '.' is relative to the runner's GITHUB_WORKSPACE environment variable.
+      The relative path to the repository root directory.
+      This path is relative to the path designated as the runner's `GITHUB_WORKSPACE` environment variable.
     required: false
-    default: "."
+    default: '.'
   version:
-    description: "The desired version of the clang tools to use. Accepted options are strings which can be 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4 or 3.9. Defaults to 12."
+    description: |
+      The desired version of the [clang-tools](https://github.com/cpp-linter/clang-tools-pip) to use.
+      Accepted options are strings which can be 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10 or 9.
+
+      - Set this option to a blank string (`''`) to use the platform's default installed version.
+      - This value can also be a path to where the clang tools are installed (if using a custom install location).
     required: false
-    default: "12"
+    default: 18
   verbosity:
-    description: A hidden option to control the action's log verbosity. This is the `logging` level (defaults to DEBUG).
+    description: |
+      This controls the action's verbosity in the workflow's logs.
+      Supported options are `info` or `debug`.
+      This option does not affect the verbosity of resulting thread comments or file annotations.
+
+      The verbosity can also be engaged by enabling debug logs when
+      [re-running jobs or workflows](https://docs.github.com/en/actions/managing-workflow-runs/re-running-workflows-and-jobs).
     required: false
-    default: "10"
+    default: info
   lines-changed-only:
-    description: Set this option to 'true' to only analyze changes in the event's diff. Defaults to 'false'.
+    description: |
+      This controls what part of the files are analyzed. The following values are accepted:
+
+      - `false`: All lines in a file are analyzed.
+      - `true`: Only lines in the diff that contain additions are analyzed.
+      - `diff`: All lines in the diff are analyzed (including unchanged lines but not subtractions).
+
+      !!! info "Important"
+          This feature requires special permissions to perform successfully.
+          See our [documented permissions](permissions.md)
     required: false
     default: false
   files-changed-only:
-    description: Set this option to 'false' to analyze any source files in the repo. Defaults to 'true'.
+    description: |
+      Set this option to false to analyze any source files in the repo.
+      This is automatically enabled if [`lines-changed-only`](#lines-changed-only) is enabled.
+
+      !!! info "Important"
+          This feature requires special permissions to perform successfully.
+          See our [documented permissions](permissions.md)
     required: false
     default: true
   ignore:
-    description: >
+    description: |
       Set this option with string of path(s) to ignore.
 
-      - In the case of multiple paths, you can use a pipe character ('|')
-        to separate the multiple paths. Multiple lines are forbidden as input to this option.
+      - In the case of multiple paths, you can use a pipe character (`|`)
+        to separate the multiple paths. Multiple lines are forbidden as an input to this option;
+        it must be a single string.
       - This can also have files, but the file's relative path has to be specified
         as well.
-      - There is no need to use './' for each entry; a blank string ('') represents
-        the repo-root path (specified by the `repo-root` input option).
-      - Path(s) containing a space should be inside single quotes.
-      - Submodules are automatically ignored.
-      - Prefix a path with a bang (`!`) to make it explicitly not ignored - order of
-        multiple paths does take precedence. The `!` prefix can be applied to
-        submodules if desired.
-      - Glob patterns are not supported here. All asterisk characters ('*') are literal.
+      - There is no need to use `./` for each entry; a blank string (`''`) represents
+        the [`repo-root`](#repo-root) path.
+      - Submodules are automatically ignored. Hidden directories (beginning with a `.`) are also ignored
+        automatically.
+      - Prefix a path with a bang (`!`) to make it explicitly _not_ ignored. The order of
+        multiple paths does _not_ take precedence. The `!` prefix can be applied to
+        a submodule's path (if desired) but not hidden directories.
+      - **As of v2.12**, glob patterns are supported here.
+        All asterisk characters (`*`) were previously literal.
     required: false
-    default: ".github"
+    default: '.github'
+  ignore-tidy:
+    description: |-
+      Use this option to allow clang-tidy to ignore certain paths/files.
+      See [`ignore`](#ignore) for more details on possible values.
+    required: false
+    default: '.github'
+  ignore-format:
+    description: |-
+      Use this option to allow clang-format to ignore certain paths/files.
+      See [`ignore`](#ignore) for more details on possible values.
+    required: false
+    default: '.github'
+  thread-comments:
+    description: |
+      This controls the behavior of posted thread comments as feedback. The following options are supported:
+
+      - `true`: enable the use of thread comments. This will always delete an outdated thread comment and post a new comment (triggering a notification for every comment).
+      - `update`: update an existing thread comment if one already exists. This option does not trigger a new notification for every thread comment update.
+      - `false`: disable the use of thread comments.
+
+      !!! info "Important"
+          This feature requires special permissions to perform successfully.
+          See our [documented permissions](permissions.md)
+
+      > [!NOTE]
+      > If run on a private repository, then this feature is disabled because the GitHub REST API behaves differently for thread comments on a private repository.
+    required: false
+    default: 'false'
+  no-lgtm:
+    description: |
+      Set this option to true or false to enable or disable the use of a
+      thread comment or pull request review that basically says 'Looks Good To Me' (when all checks pass).
+      The default value, `true` means no LGTM comment posted.
+
+      See [`thread-comments`](#thread-comments), [`tidy-review`](#tidy-review),
+      and [`format-review`](#format-review) options for further details.
+    required: false
+    default: true
+  step-summary:
+    description: |
+      Set this option to true to append content as part of workflow's job summary.
+
+      See implementation details in GitHub's documentation about
+      [Adding a job summary](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary).
+      This option is independent of the [`thread-comments`](#thread-comments) option,
+      rather this option uses the same content that the
+      [`thread-comments`](#thread-comments) option would use.
+
+      > [!NOTE]
+      > The [`no-lgtm`](#no-lgtm) option is _not_ applied to step summaries.
+    required: false
+    default: false
+  file-annotations:
+    description: |
+      Set this option to false to disable the use of file annotations as feedback.
+    required: false
+    default: true
   database:
-    description: The directory containing compile_commands.json file.
+    description: The directory containing compilation database (like compile_commands.json) file.
     required: false
     default: ""
   extra-args:
-    description: A string of extra arguments passed to clang-tidy for use as compiler arguments. Multiple arguments are separated by spaces so the argument name and value should use an '=' sign instead of a space.
+    description: |
+      A string of extra arguments passed to clang-tidy for use as compiler arguments.
+      Multiple arguments are separated by spaces so the argument name and value should
+      use an `=` sign instead of a space.
+
+      !!! example
+
+          ``` yaml
+          extra-args: '-std=c++17 -Wall'
+          ```
+          This will be passed to clang-tidy as multiple `--extra-arg` options:
+          ```
+          clang-tidy --extra-arg=-std=c++17 --extra-arg=-Wall
+          ```
     required: false
     default: ""
+  tidy-review:
+    description: |
+      Set this option to `true` to enable Pull Request reviews from clang-tidy.
+
+      !!! info "Important"
+          This feature requires special permissions to perform successfully.
+          See our [documented permissions](permissions.md).
+
+          See also [the PR review feature caveats](pr-review-caveats.md).
+
+      > [!NOTE]
+      > The [`no-lgtm`](#no-lgtm) option is applicable to Pull Request reviews.
+    required: false
+    default: false
+  format-review:
+    description: |
+      Set this option to `true` to enable Pull Request reviews from clang-format.
+
+      !!! info "Important"
+          This feature requires special permissions to perform successfully.
+          See our [documented permissions](permissions.md).
+
+          See also [the PR review feature caveats](pr-review-caveats.md).
+
+      > [!NOTE]
+      > The [`no-lgtm`](#no-lgtm) option is applicable to Pull Request reviews.
+    required: false
+    default: false
+  passive-reviews:
+    description: |
+      Set this option to `true` to prevent Pull Request reviews from approving or requesting changes.
+    default: false
+    required: false
+  jobs:
+    description: |
+      The number of jobs to run in parallel.
+      If less than or equal to 0, the number of jobs is set to
+      use the number of all available CPU cores.
+    required: false
+    default: 0
+  cache-enable:
+    description: |-
+      Controls the caching of cpp-linter dependencies.
+      The installed `clang-format` and `clang-tidy` tools are not cached.
+
+      By default, this is enabled.
+      Any cached assets are kept within the path to this action's source
+      (not in the runner's workspace or temp directory).
+    required: false
+    default: true
 outputs:
   checks-failed:
-    description: An integer that can be used as a boolean value to indicate if all checks failed.
+    description: An integer that can be used as a boolean value to indicate if any checks failed by clang-tidy and clang-format.
     value: ${{ steps.cpp-linter.outputs.checks-failed }}
+  clang-tidy-checks-failed:
+    description: An integer that can be used as a boolean value to indicate if any checks failed by clang-tidy only.
+    value: ${{ steps.cpp-linter.outputs.clang-tidy-checks-failed }}
+  clang-format-checks-failed:
+    description: An integer that can be used as a boolean value to indicate if any checks failed by clang-format only.
+    value: ${{ steps.cpp-linter.outputs.clang-format-checks-failed }}
 runs:
   using: "composite"
   steps:
-    - name: Install action dependencies
-      shell: bash
+    - name: Setup nu shell
+      # I'm done writing everything twice (in bash and powershell)
+      # With nu shell, we use the same shell/script for all platforms
+      uses: hustcer/setup-nu@920172d92eb04671776f3ba69d605d3b09351c30 # v3.22
+      with:
+        version: '0.106.1'
+
+    - name: Compute cache key
+      if: inputs.cache-enable == 'true' || inputs.cache-enable == true
+      id: compute-cache-key
+      shell: nu {0}
+      run: |-
+        let action_path = $env.GITHUB_ACTION_PATH | path expand
+        let lock_file = $action_path | path join 'uv.lock'
+        let action_file = $action_path | path join 'action.yml'
+        let key = (
+            if ($lock_file | path exists) {
+                open $lock_file --raw | hash sha256
+            } else {
+                open $action_file --raw | hash sha256
+            }
+        )
+        $'key=($key)\n' | save --append $env.GITHUB_OUTPUT
+
+    - name: Enable cache
+      if: inputs.cache-enable == 'true' || inputs.cache-enable == true
+      uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+      with:
+        path: ${{ runner.temp }}/cpp-linter-action-cache
+        key: cpp-linter-action_${{ runner.os }}_${{ steps.compute-cache-key.outputs.key }}
+
+    - name: Install Linux clang dependencies
+      if: runner.os == 'Linux'
+      shell: nu {0}
       run: |
-        if [[ "${{runner.os}}"  == "Linux" ]]; then
-          sudo apt-get update
-          # First try installing from default Ubuntu repositories before trying LLVM script
-          if ! sudo apt-get install -y clang-format-${{ inputs.version }} clang-tidy-${{ inputs.version }}; then
-            # This LLVM script will add the relevant LLVM PPA: https://apt.llvm.org/
-            wget https://apt.llvm.org/llvm.sh -O $GITHUB_ACTION_PATH/llvm_install.sh
-            chmod +x $GITHUB_ACTION_PATH/llvm_install.sh
-            if sudo $GITHUB_ACTION_PATH/llvm_install.sh ${{ inputs.version }}; then
-              sudo apt-get install -y clang-format-${{ inputs.version }} clang-tidy-${{ inputs.version }}
-            fi
-          fi
-        fi
-        if [[ "${{runner.os}}"  == "macOS" ]]; then
-          python3 -m venv "$GITHUB_ACTION_PATH/venv"
-          source "$GITHUB_ACTION_PATH/venv/bin/activate"
-        fi
-        python3 -m pip install -r "$GITHUB_ACTION_PATH/requirements.txt"
-        clang-tools -i ${{ inputs.version }} -b
+        let action_path = $env.GITHUB_ACTION_PATH | path expand
+        let apt_install_args = [
+            install -y clang-format-${{ inputs.version }} clang-tidy-${{ inputs.version }}
+        ]
+        let has_sudo = not ((which 'sudo') | is-empty)
+
+        # First try installing from default Ubuntu repositories before trying LLVM script
+        let are_tools_present = (
+            if $has_sudo {
+                ^sudo apt-get update
+                ^sudo apt-get ...$apt_install_args
+            } else {
+                ^apt-get update
+                ^apt-get  ...$apt_install_args
+            }
+        ) | complete | $in.exit_code == 0
+        if (not $are_tools_present) {
+          # This LLVM script will add the relevant LLVM PPA: https://apt.llvm.org/
+          (
+            http get --raw --redirect-mode follow https://apt.llvm.org/llvm.sh
+            | save $"($action_path)/llvm_install.sh"
+          )
+          ^chmod +x $"($action_path)/llvm_install.sh"
+
+          let llvm_installer_result = (
+            if $has_sudo {
+                ^sudo $"($action_path)/llvm_install.sh" ${{ inputs.version }}
+            } else {
+                ^bash $"($action_path)/llvm_install.sh" ${{ inputs.version }}
+            }
+          ) | complete
+          print $llvm_installer_result
+
+          if ($llvm_installer_result.exit_code == 0) {
+            let result = (
+              if $has_sudo {
+                  ^sudo apt-get ...$apt_install_args
+              } else {
+                  ^apt-get ...$apt_install_args
+              }
+            ) | complete
+            print $result
+          }
+        }
+
+    - name: Install MacOS clang dependencies
+      if: runner.os == 'macOS'
+      shell: nu {0}
+      run: |-
+        ^brew update
+        let brew_install_arg = 'llvm@${{ inputs.version }}'
+        let result = (^brew install $brew_install_arg) | complete
+        print $result
+        if ($result.exit_code == 0) {
+          let brew_prefix = ^brew --prefix $brew_install_arg
+          ^ln -s $"($brew_prefix)/bin/clang-format" "/usr/local/bin/clang-format-${{ inputs.version }}"
+          ^ln -s $"($brew_prefix)/bin/clang-tidy" "/usr/local/bin/clang-tidy-${{ inputs.version }}"
+        }
+
+    - name: Setup cpp-linter dependencies
+      shell: nu {0}
+      env:
+        UV_NO_MODIFY_PATH: 1
+        UV_VERSION: '0.9.5'
+      run: |-
+        let action_path = $env.GITHUB_ACTION_PATH | path expand
+        $env.UV_INSTALL_DIR = $action_path | path join 'bin'
+
+        $env.UV_CACHE_DIR = $env.RUNNER_TEMP | path join 'cpp-linter-action-cache'
+        if (not ($env.UV_CACHE_DIR | path exists)) {
+          mkdir $env.UV_CACHE_DIR
+        }
+
+        print $"\n(ansi purple)Installing uv version ($env.UV_VERSION)(ansi reset)"
+        let is_windows = (sys host | get 'name') == 'Windows'
+        let uv_installer_url = if $is_windows {
+          $"https://astral.sh/uv/($env.UV_VERSION)/install.ps1"
+        } else {
+          $"https://astral.sh/uv/($env.UV_VERSION)/install.sh"
+        }
+        let installer = http get --raw --redirect-mode follow $uv_installer_url
+        if $is_windows {
+          ^powershell -ExecutionPolicy ByPass $installer
+        } else {
+          $installer | ^sh
+        }
+
+        let gh_action_debug = $env | get --optional 'ACTIONS_STEP_DEBUG'
+        let action_verbosity = '${{ inputs.verbosity }}' == 'debug'
+        let verbosity = (
+          $action_verbosity
+          or ($gh_action_debug == true)
+          or ($gh_action_debug == 'true')
+        )
+
+        print $"\n(ansi purple)Installing workflow dependencies(ansi reset)"
+        mut uv_args = [sync --project $action_path --group action --no-dev --link-mode=copy]
+        if $verbosity {
+          $uv_args = $uv_args | append '-v'
+        }
+        ^$'($env.UV_INSTALL_DIR)/uv' ...$uv_args
+
+        print $"\n(ansi purple)Ensuring clang-format and clang-tidy ${{ inputs.version }} are present(ansi reset)"
+        let cmd = [clang-tools -i ${{ inputs.version }} -b]
+        $uv_args = [run --no-sync --project $action_path --directory (pwd)]
+        if $verbosity {
+          $uv_args = $uv_args | append '-v'
+        }
+        ^$'($env.UV_INSTALL_DIR)/uv' ...$uv_args ...$cmd
 
     - name: Run cpp-linter
       id: cpp-linter
-      shell: bash
-      run: |
-        if [[ "${{runner.os}}"  == "macOS" ]]; then
-          source "$GITHUB_ACTION_PATH/venv/bin/activate"
-        fi
-        cpp-linter \
-          --style="${{ inputs.style }}" \
-          --extensions=${{ inputs.extensions }} \
-          --tidy-checks="${{ inputs.tidy-checks }}" \
-          --repo-root=${{ inputs.repo-root }} \
-          --version=${{ inputs.version }} \
-          --verbosity=${{ inputs.verbosity }} \
-          --lines-changed-only=${{ inputs.lines-changed-only }} \
-          --files-changed-only=${{ inputs.files-changed-only }} \
-          --thread-comments=${{ inputs.thread-comments }} \
-          --step-summary=${{ inputs.step-summary }} \
-          --ignore="${{ inputs.ignore }}" \
-          --database=${{ inputs.database }} \
-          --file-annotations=${{ inputs.file-annotations }} \
-          --extra-arg="${{ inputs.extra-args }}"
+      shell: nu {0}
+      run: |-
+        let action_path = $env.GITHUB_ACTION_PATH | path expand
+        $env.UV_INSTALL_DIR = $action_path | path join 'bin'
+        $env.UV_CACHE_DIR = $env.RUNNER_TEMP | path join 'cpp-linter-action-cache'
+
+        let args = [
+          '--style=${{ inputs.style }}'
+          '--extensions=${{ inputs.extensions }}'
+          '--tidy-checks=${{ inputs.tidy-checks }}'
+          '--repo-root=${{ inputs.repo-root }}'
+          '--version=${{ inputs.version }}'
+          '--verbosity=${{ inputs.verbosity }}'
+          '--lines-changed-only=${{ inputs.lines-changed-only }}'
+          '--files-changed-only=${{ inputs.files-changed-only }}'
+          '--thread-comments=${{ inputs.thread-comments }}'
+          '--no-lgtm=${{ inputs.no-lgtm }}'
+          '--step-summary=${{ inputs.step-summary }}'
+          '--ignore=${{ inputs.ignore }}'
+          '--ignore-tidy=${{ inputs.ignore-tidy }}'
+          '--ignore-format=${{ inputs.ignore-format }}'
+          '--database=${{ inputs.database }}'
+          '--file-annotations=${{ inputs.file-annotations }}'
+          '--extra-arg=${{ inputs.extra-args }}'
+          '--tidy-review=${{ inputs.tidy-review }}'
+          '--format-review=${{ inputs.format-review }}'
+          '--passive-reviews=${{ inputs.passive-reviews }}'
+          '--jobs=${{ inputs.jobs }}'
+        ]
+        mut uv_args = [run --no-sync --project $action_path --directory (pwd)]
+
+        let gh_action_debug = $env | get --optional 'ACTIONS_STEP_DEBUG'
+        let action_verbosity = '${{ inputs.verbosity }}' == 'debug'
+        let verbosity = (
+          $action_verbosity
+          or ($gh_action_debug == true)
+          or ($gh_action_debug == 'true')
+        )
+        if $verbosity {
+          $uv_args = $uv_args | append '-v'
+        }
+
+        let local_bin = '~/.local/bin' | path expand
+        if (
+          ('${{ runner.os }}' == 'Linux')
+          and ($local_bin | path exists)
+          and (not ($env.PATH | any {$in == $local_bin}))
+        ) {
+          # add ~/.local/bin to PATH (temporarily)
+          $env.PATH = $env.PATH | append $local_bin
+        }
+
+        print $"\n(ansi purple)Running cpp-linter(ansi reset)"
+        ^$'($env.UV_INSTALL_DIR)/uv' ...$uv_args cpp-linter ...$args

@@ -2,15 +2,20 @@ name: cpp-linter
 
 on:
   push:
-    paths-ignore: "docs/**"
+    paths:
+      - "docs/examples/demo/*"
   pull_request:
-    paths-ignore: "docs/**"
+    paths:
+      - "docs/examples/demo/*"
+
 
 jobs:
   cpp-linter:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          persist-credentials: false
       - uses: cpp-linter/cpp-linter-action@main
         id: linter
         continue-on-error: true
@@ -19,6 +24,7 @@ jobs:
         with:
           style: file
           files-changed-only: false
+          thread-comments: false
 
       - name: Fail fast?!
         if: steps.linter.outputs.checks-failed != 0

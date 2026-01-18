@@ -6,10 +6,35 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    directory: "/"
     schedule:
       interval: "weekly"
-  - package-ecosystem: pip
+    groups:
+      actions:
+        patterns:
+          - "*"
+  - package-ecosystem: uv
     directory: /
     schedule:
       interval: "daily"
+    groups:
+      org:
+        # updates about org-maintained packages
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "mypy*"
+          - "pre-commit*"
+          - "ruff*"
+          - "mkdocs*"
+          - "pyyaml*"
+      dev:
+        # updates about everything else (dev and docs)
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "clang-tools*"
+          - "cpp-linter*"
+        update-types:
+          - major
+          - minor
