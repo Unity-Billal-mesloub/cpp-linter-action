@@ -22,9 +22,9 @@
 # C/C++ Linter Action <sub><sup>| clang-format & clang-tidy</sup></sub>
 
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/cpp-linter/cpp-linter-action)
-[![GitHub marketplace](https://img.shields.io/badge/marketplace-C%2FC%2B%2B%20Linter-blue?logo=github)](https://github.com/marketplace/actions/c-c-linter)
-[![cpp-linter](https://github.com/cpp-linter/cpp-linter-action/actions/workflows/cpp-linter.yml/badge.svg)](https://github.com/cpp-linter/cpp-linter-action/actions/workflows/cpp-linter.yml)
-[![MkDocs Deploy](https://github.com/cpp-linter/cpp-linter-action/actions/workflows/mkdocs-deploy.yml/badge.svg)](https://github.com/cpp-linter/cpp-linter-action/actions/workflows/mkdocs-deploy.yml)
+[![GitHub marketplace](https://img.shields.io/badge/marketplace-C%2FC%2B%2B%20Linter-blue?logo=github)](https://github.com/Unity-Billal-mesloub/actions/c-c-linter)
+[![cpp-linter](https://github.com/Unity-Billal-mesloub/cpp-linter-action/actions/workflows/cpp-linter.yml/badge.svg)](https://github.com/Unity-Billal-mesloub/cpp-linter-action/actions/workflows/cpp-linter.yml)
+[![MkDocs Deploy](https://github.com/Unity-Billal-mesloub/cpp-linter-action/actions/workflows/mkdocs-deploy.yml/badge.svg)](https://github.com/Unity-Billal-mesloub/cpp-linter-action/actions/workflows/mkdocs-deploy.yml)
 ![GitHub](https://img.shields.io/github/license/cpp-linter/cpp-linter-action?label=license&logo=github)
 
 A Github Action for linting C/C++ code integrating clang-tidy and clang-format
